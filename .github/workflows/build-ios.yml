@@ -1,0 +1,29 @@
+name: Build Godot iOS IPA
+
+on:
+  workflow_dispatch: # 允许手动点击运行
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v1
+        with:
+          version: 4.3.0 # 替换为你项目使用的 Godot 版本
+          use-dotnet: false
+          include-templates: true # 自动下载导出模板
+
+      - name: Export iOS
+        run: |
+          mkdir -p build
+          godot --headless --export-release "iOS" build/game.ipa
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-ios-ipa
+          path: build/game.ipa
