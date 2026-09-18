@@ -14,8 +14,6 @@ jobs:
       - name: Download Game Zip
         run: |
           curl -L -o game.zip "https://github.com/robloxdew/robloxdew.github.io/releases/download/1.1.0/chain.zip"
-          echo "====== 下载的文件大小 ======"
-          ls -lh game.zip
 
       - name: Unzip Game Project
         run: |
@@ -26,7 +24,7 @@ jobs:
       - name: Setup Godot
         uses: chickensoft-games/setup-godot@v2
         with:
-          version: 4.7.2-stable # ⚠️ 如果这里报错，请改成 4.7.2
+          version: 4.7.2-stable # ⚠️ 如果这里报错找不到，请改成 4.7.2
           use-dotnet: false
           include-templates: true
 
@@ -35,35 +33,22 @@ jobs:
           mkdir -p build
           cd $(dirname $(find godot_project -name "project.godot" | head -n 1))
 
-          # 用 Python 脚本精准修复你配置文件里的错误
-          python3 << 'PYEOF'
-          import re
-          file_path = 'export_presets.cfg'
-          if os.path.exists(file_path):
-              with open(file_path, 'r') as f:
-                  content = f.read()
+          # 使用 sed 精准修改配置文件，解决冲突和非法字段
+          # 1. 清空非法的 Team ID（未签名必须留空）
+          sed -i '' 's|application/app_store_team_id=".*"|application/app_store_team_id=""|g' export_presets.cfg
+          
+          # 2. 统一 Bundle Identifier，解决你文件里 com.robloxdew.chain 和 com.dewrb.game 的冲突
+          sed -i '' 's|application/bundle_identifier=".*"|application/bundle_identifier="com.robloxdew.chain"|g' export_presets.cfg
+          
+          # 3. 清空所有签名和描述文件，强制走未签名流程
+          sed -i '' 's|application/code_sign_identity_debug=".*"|application/code_sign_identity_debug=""|g' export_presets.cfg
+          sed -i '' 's|application/code_sign_identity_release=".*"|application/code_sign_identity_release=""|g' export_presets.cfg
+          sed -i '' 's|application/provisioning_profile_specifier_debug=".*"|application/provisioning_profile_specifier_debug=""|g' export_presets.cfg
+          sed -i '' 's|application/provisioning_profile_specifier_release=".*"|application/provisioning_profile_specifier_release=""|g' export_presets.cfg
 
-              # 1. 强制清空非法的 Team ID（未签名必须留空）
-              content = re.sub(r'application/app_store_team_id=".*?"', 'application/app_store_team_id=""', content)
-              
-              # 2. 统一 Bundle Identifier，解决你文件里的冲突
-              content = re.sub(r'application/bundle_identifier=".*?"', 'application/bundle_identifier="com.robloxdew.chain"', content)
-
-              # 3. 清空所有签名和描述文件，强制走未签名流程
-              content = re.sub(r'application/code_sign_identity_debug=".*?"', 'application/code_sign_identity_debug=""', content)
-              content = re.sub(r'application/code_sign_identity_release=".*?"', 'application/code_sign_identity_release=""', content)
-              content = re.sub(r'application/provisioning_profile_specifier_debug=".*?"', 'application/provisioning_profile_specifier_debug=""', content)
-              content = re.sub(r'application/provisioning_profile_specifier_release=".*?"', 'application/provisioning_profile_specifier_release=""', content)
-
-              with open(file_path, 'w') as f:
-                  f.write(content)
-              print('✅ 配置文件已自动修复完毕！')
-          else:
-              print('❌ 找不到 export_presets.cfg')
-          PYEOF
-
-          echo "====== 修复后的配置片段 ======"
-          grep -A 5 "preset.1.options" export_presets.cfg | head -n 10
+          echo "====== 修复后的关键行 ======"
+          grep "bundle_identifier" export_presets.cfg
+          grep "app_store_team_id" export_presets.cfg
           
           # 执行导出
           godot --headless --export-release "iOS" ../../build/chain.ipa
