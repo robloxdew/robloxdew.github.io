@@ -13,25 +13,21 @@ jobs:
 
       - name: Download Game Zip
         run: |
-          # ⚠️ 更新为 1.1.0 的新链接
           curl -L -o game.zip "https://github.com/robloxdew/robloxdew.github.io/releases/download/1.1.0/chain.zip"
           echo "====== 下载的文件大小 ======"
           ls -lh game.zip
-          file game.zip
 
       - name: Unzip Game Project
         run: |
           mkdir -p godot_project
           ditto -x -k game.zip godot_project
-          echo "====== 解压后的目录结构 ======"
-          ls -la godot_project
           echo "====== 查找 project.godot ======"
           find godot_project -name "project.godot"
 
       - name: Setup Godot
         uses: chickensoft-games/setup-godot@v2
         with:
-          version: 4.7.2-stable
+          version: 4.7.2-stable # ⚠️ 如果这里报错找不到版本，请改成 4.7.2
           use-dotnet: false
           include-templates: true
 
@@ -39,21 +35,45 @@ jobs:
         run: |
           mkdir -p build
           cd $(dirname $(find godot_project -name "project.godot" | head -n 1))
-          
-          # ⚠️ 自动确保 iOS 导出配置里有包名，防止因为配置不全报错
-          echo "====== 修复前的 export_presets.cfg ======"
-          cat export_presets.cfg
-          
-          if ! grep -q "application/bundle_identifier" export_presets.cfg; then
-            sed -i '' '/\[preset.0.options\]/a\
-          application/bundle_identifier="com.robloxdew.chain"
-          ' export_presets.cfg
-          fi
-          
-          echo "====== 修复后的配置 ======"
-          cat export_presets.cfg
-          
-          # ⚠️ 这个 "iOS" 必须和 Godot 预设名一致
+
+          # 使用 Python 脚本自动修复缺失的 iOS 导出配置
+          python3 << 'PYEOF'
+          import os
+          file_path = 'export_presets.cfg'
+          if os.path.exists(file_path):
+              with open(file_path, 'r') as f:
+                  content = f.read()
+
+              if 'name="iOS"' not in content:
+                  print('❌ 错误：找不到名为 iOS 的导出预设！请检查你的 Godot 导出预设名称。')
+              else:
+                  print('✅ 找到 iOS 预设，开始检查配置...')
+                  modified = False
+                  if 'application/bundle_identifier' not in content:
+                      content = content.replace('[preset.0.options]', '[preset.0.options]\napplication/bundle_identifier="com.robloxdew.chain"')
+                      modified = True
+                  if 'application/signature' not in content:
+                      content = content.replace('[preset.0.options]', '[preset.0.options]\napplication/signature=""')
+                      modified = True
+                  if 'application/app_store_team_id' not in content:
+                      content = content.replace('[preset.0.options]', '[preset.0.options]\napplication/app_store_team_id=""')
+                      modified = True
+
+                  if modified:
+                      with open(file_path, 'w') as f:
+                          f.write(content)
+                      print('✅ 已自动补全缺失的配置。')
+                  else:
+                      print('✅ 配置已完整，无需修改。')
+
+                  print('====== 导出前 export_presets.cfg 内容 ======')
+                  with open(file_path, 'r') as f:
+                      print(f.read())
+          else:
+              print('❌ 找不到 export_presets.cfg 文件！请确保打包时包含了此文件。')
+          PYEOF
+
+          # 执行导出
           godot --headless --export-release "iOS" ../../build/chain.ipa
 
       - name: Upload IPA Artifact
