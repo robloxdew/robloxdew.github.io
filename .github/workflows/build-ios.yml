@@ -1,46 +1,45 @@
 name: Build Godot iOS IPA
 
 on:
-  workflow_dispatch: # 允许手动点击运行
+  workflow_dispatch:
 
 jobs:
   build-ios:
-    runs-on: macos-latest # 苹果环境，自带 Xcode
+    runs-on: macos-latest
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # ⚠️ 步骤1：从 Release 下载你的游戏包（如果你把 zip 直接放在仓库里，请删除这步）
       - name: Download Game Zip
         run: |
-          # 把下面的链接换成你 Release 里 game.zip 的真实下载链接
-          curl -L -o chain.zip "https://github.com/robloxdew/robloxdew.github.io/releases/download/1.0.0/chain.zip   # ⚠️ 步骤2：解压游戏文件
-      # 如果你的 zip 解压后里面套了一层文件夹，可能会失败，注意看日志
+          curl -L -o game.zip "https://github.com/robloxdew/robloxdew.github.io/releases/download/1.0.0/chain.zip"
+
       - name: Unzip Game Project
         run: |
           mkdir -p godot_project
-          unzip -o chain.zip -d godot_project
+          unzip -o game.zip -d godot_project
+          echo "====== 解压后的目录结构 ======"
+          ls -la godot_project
+          echo "====== 查找 project.godot ======"
+          find godot_project -name "project.godot"
 
-      # 步骤3：安装 Godot
       - name: Setup Godot
-        uses: chickensoft-games/setup-godot@v1
+        uses: chickensoft-games/setup-godot@v2
         with:
-          version: 4.7.0 # ⚠️⚠️⚠️ 务必改成你项目的 Godot 版本号（比如 4.2.1 或 4.3.0）
+          version: 4.7.2-stable
           use-dotnet: false
           include-templates: true
 
-      # 步骤4：执行导出
       - name: Export iOS (Unsigned IPA)
         run: |
           mkdir -p build
           cd godot_project
-          # ⚠️⚠️⚠️ 下面这个 "iOS" 必须和 Godot 导出预设里的名字一模一样（区分大小写）
-          godot --headless --export-release "iOS" ../build/game.ipa
+          godot --headless --export-release "iOS" ../build/chain.ipa
 
-      # 步骤5：将打包好的 IPA 上传，供你下载
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: godot-ios-ipa
-          path: build/game.ipa
+          path: build/chain.ipa
           if-no-files-found: error
