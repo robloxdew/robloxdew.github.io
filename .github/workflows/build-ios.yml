@@ -14,28 +14,35 @@ jobs:
       - name: Download Game Zip
         run: |
           curl -L -o game.zip "https://github.com/robloxdew/robloxdew.github.io/releases/download/1.0.0/chain.zip"
+          echo "====== 下载后的文件信息 ======"
+          ls -la game.zip
+          file game.zip
 
       - name: Unzip Game Project
         run: |
           mkdir -p godot_project
-          unzip -o game.zip -d godot_project
+          # 使用 macOS 原生的 ditto 命令解压，避免 unzip 的乱码/警告报错
+          ditto -x -k game.zip godot_project
           echo "====== 解压后的目录结构 ======"
           ls -la godot_project
-          echo "====== 查找 project.godot ======"
+          echo "====== 查找 project.godot 所在位置 ======"
           find godot_project -name "project.godot"
 
       - name: Setup Godot
         uses: chickensoft-games/setup-godot@v2
         with:
-          version: 4.7.2-stable
+          version: 4.7.2-stable # ⚠️ 如果你跑失败，尝试改成 4.7.2 或 4.4.1 测试
           use-dotnet: false
           include-templates: true
 
       - name: Export iOS (Unsigned IPA)
         run: |
           mkdir -p build
-          cd godot_project
-          godot --headless --export-release "iOS" ../build/chain.ipa
+          # 自动进入包含 project.godot 的目录
+          cd $(dirname $(find godot_project -name "project.godot" | head -n 1))
+          echo "当前工作目录: $(pwd)"
+          # ⚠️ 下面这个 "iOS" 必须和 Godot 里导出预设的名字完全一致！
+          godot --headless --export-release "iOS" ../../build/chain.ipa
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
