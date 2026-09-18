@@ -7,23 +7,25 @@ jobs:
   build-ios:
     runs-on: macos-latest
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Setup Godot
         uses: chickensoft-games/setup-godot@v1
         with:
-          version: 4.3.0 # 替换为你项目使用的 Godot 版本
+          version: 4.7.0 # ⚠️ 改成你 Godot 项目的版本号
           use-dotnet: false
-          include-templates: true # 自动下载导出模板
+          include-templates: true
 
-      - name: Export iOS
+      - name: Export iOS (Unsigned IPA)
         run: |
           mkdir -p build
+          # ⚠️ 下面这个 "iOS" 必须和 Godot 里导出预设的名字一模一样！
           godot --headless --export-release "iOS" build/game.ipa
-          
-      - name: Upload Artifact
+
+      - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: godot-ios-ipa
           path: build/game.ipa
+          if-no-files-found: error
