@@ -27,47 +27,30 @@ jobs:
           use-dotnet: false
           include-templates: true
 
-      - name: Clean Config and Export
+      - name: Fix Original Config and Export
         run: |
           mkdir -p build
           PROJECT_DIR=$(dirname $(find godot_project -name "project.godot" | head -n 1))
           cd "$PROJECT_DIR"
           echo "当前项目目录: $(pwd)"
 
-          # 1. 强制删除原配置文件，从零生成新文件
-          rm -f export_presets.cfg
+          # 1. 使用 sed 精准把错误的 Team ID 改成假的有效值
+          sed -i '' 's|application/app_store_team_id=".*"|application/app_store_team_id="ABCDE12345"|g' export_presets.cfg
+          
+          # 2. 把冲突的包名统一
+          sed -i '' 's|application/bundle_identifier=".*"|application/bundle_identifier="com.robloxdew.chain"|g' export_presets.cfg
+          
+          # 3. 确保签名和描述文件为空（未签名）
+          sed -i '' 's|application/code_sign_identity_debug=".*"|application/code_sign_identity_debug=""|g' export_presets.cfg
+          sed -i '' 's|application/code_sign_identity_release=".*"|application/code_sign_identity_release=""|g' export_presets.cfg
+          sed -i '' 's|application/provisioning_profile_specifier_debug=".*"|application/provisioning_profile_specifier_debug=""|g' export_presets.cfg
+          sed -i '' 's|application/provisioning_profile_specifier_release=".*"|application/provisioning_profile_specifier_release=""|g' export_presets.cfg
 
-          # 2. 生成干净配置。使用 printf 确保没有任何多余的 YAML 缩进。
-          printf '%s\n' \
-            '[preset.0]' \
-            'name="iOS"' \
-            'platform="iOS"' \
-            'runnable=true' \
-            'export_filter="all_resources"' \
-            'export_path="../../build/chain.ipa"' \
-            '' \
-            '[preset.0.options]' \
-            'application/bundle_identifier="com.robloxdew.chain"' \
-            'application/app_store_team_id="ABCDE12345"' \
-            'application/signature=""' \
-            'application/code_sign_identity_debug=""' \
-            'application/code_sign_identity_release=""' \
-            'application/provisioning_profile_specifier_debug=""' \
-            'application/provisioning_profile_specifier_release=""' \
-            'application/export_method_debug=0' \
-            'application/export_method_release=0' \
-            'application/targeted_device_family=0' \
-            'application/min_ios_version="14.0"' \
-            'architectures/arm64=true' \
-            > export_presets.cfg
+          echo "========== 修复后的配置关键行 =========="
+          grep -E 'name=|bundle_identifier|app_store_team_id|export_path' export_presets.cfg
 
-          # 3. 最后用 sed 移除文件行首任何可能残留的空白字符（终极保险）
-          sed -i '' 's/^[[:space:]]*//' export_presets.cfg
-
-          echo "========== 检查生成的配置文件 =========="
-          cat -A export_presets.cfg | head -n 20
-
-          echo "========== 开始执行导出（带 --verbose 以获取详细报错） =========="
+          echo "========== 开始执行导出 =========="
+          # 带 --verbose 获取详细报错信息
           godot --verbose --headless --export-release "iOS" ../../build/chain.ipa
 
       - name: Upload IPA Artifact
