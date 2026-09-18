@@ -14,6 +14,8 @@ jobs:
       - name: Download Game Zip
         run: |
           curl -L -o game.zip "https://github.com/robloxdew/robloxdew.github.io/releases/download/1.1.0/chain.zip"
+          echo "====== 下载的文件大小 ======"
+          ls -lh game.zip
 
       - name: Unzip Game Project
         run: |
@@ -24,30 +26,93 @@ jobs:
       - name: Setup Godot
         uses: chickensoft-games/setup-godot@v2
         with:
-          version: 4.7.2-stable # ⚠️ 如果这里报错找不到，请改成 4.7.2
+          version: 4.7.2-stable # 上一次日志显示这个版本能成功下载
           use-dotnet: false
           include-templates: true
 
-      - name: Fix Config and Export
+      - name: Clean Config and Export
         run: |
           mkdir -p build
           cd $(dirname $(find godot_project -name "project.godot" | head -n 1))
 
-          # 1. 统一 Bundle Identifier，解决冲突
-          sed -i '' 's|application/bundle_identifier=".*"|application/bundle_identifier="com.robloxdew.chain"|g' export_presets.cfg
-          
-          # 2. 填一个假的有效格式 Team ID，骗过 Godot 的强校验（未签名构建无影响）
-          sed -i '' 's|application/app_store_team_id=".*"|application/app_store_team_id="XXXXXXXXXX"|g' export_presets.cfg
-          
-          # 3. 清空所有签名和描述文件
-          sed -i '' 's|application/code_sign_identity_debug=".*"|application/code_sign_identity_debug=""|g' export_presets.cfg
-          sed -i '' 's|application/code_sign_identity_release=".*"|application/code_sign_identity_release=""|g' export_presets.cfg
-          sed -i '' 's|application/provisioning_profile_specifier_debug=".*"|application/provisioning_profile_specifier_debug=""|g' export_presets.cfg
-          sed -i '' 's|application/provisioning_profile_specifier_release=".*"|application/provisioning_profile_specifier_release=""|g' export_presets.cfg
+          # 直接用一份干净的、标准的 iOS 配置覆盖原文件
+          # 消除旧文件中所有可能存在的格式错误和预设冲突
+          cat << 'EOF' > export_presets.cfg
+          [preset.0]
+          name="iOS"
+          platform="iOS"
+          runnable=true
+          dedicated_server=false
+          custom_features=""
+          export_filter="all_resources"
+          include_filter=""
+          exclude_filter=""
+          export_path="../../build/chain.ipa"
+          patches=PackedStringArray()
+          patch_delta_encoding=false
+          patch_delta_compression_level_zstd=19
+          patch_delta_min_reduction=0.1
+          patch_delta_include_filters="*"
+          patch_delta_exclude_filters=""
+          encryption_include_filters=""
+          encryption_exclude_filters=""
+          seed=0
+          encrypt_pck=false
+          encrypt_directory=false
+          script_export_mode=2
 
-          echo "====== 修复后的关键行 ======"
-          grep "bundle_identifier" export_presets.cfg
-          grep "app_store_team_id" export_presets.cfg
+          [preset.0.options]
+          custom_template/debug=""
+          custom_template/release=""
+          architectures/arm64=true
+          application/app_store_team_id="XXXXXXXXXX"
+          application/export_method_debug=3
+          application/code_sign_identity_debug=""
+          application/code_sign_identity_release=""
+          application/provisioning_profile_specifier_debug=""
+          application/provisioning_profile_specifier_release=""
+          application/export_method_release=3
+          application/bundle_identifier="com.robloxdew.chain"
+          application/signature=""
+          application/short_version=""
+          application/version=""
+          application/additional_plist_content=""
+          application/icon_interpolation=4
+          application/export_project_only=false
+          application/delete_old_export_files_unconditionally=false
+          modules/camera=false
+          entitlements/increased_memory_limit=false
+          entitlements/game_center=false
+          entitlements/push_notifications="Disabled"
+          entitlements/additional=""
+          capabilities/access_wifi=false
+          capabilities/performance_gaming_tier=false
+          capabilities/performance_a12=false
+          capabilities/additional=PackedStringArray()
+          shader_baker/enabled=false
+          user_data/accessible_from_files_app=false
+          user_data/accessible_from_itunes_sharing=false
+          privacy/camera_usage_description=""
+          privacy/microphone_usage_description=""
+          privacy/photolibrary_usage_description=""
+          privacy/file_timestamp_access_reasons=3
+          privacy/system_boot_time_access_reasons=1
+          privacy/disk_space_access_reasons=3
+          privacy/active_keyboard_access_reasons=0
+          privacy/user_defaults_access_reasons=0
+          privacy/tracking_enabled=false
+          privacy/tracking_domains=PackedStringArray()
+          application/targeted_device_family=0
+          application/min_ios_version="14.0"
+          storyboard/image_scale_mode=0
+          storyboard/custom_image@2x=""
+          storyboard/custom_image@3x=""
+          storyboard/use_custom_bg_color=false
+          storyboard/custom_bg_color=Color(0, 0, 0, 1)
+          EOF
+          
+          echo "====== 已生成干净的配置文件，开始导出 ======"
+          grep -E 'name=|bundle_identifier|app_store_team_id|export_path' export_presets.cfg
           
           # 执行导出
           godot --headless --export-release "iOS" ../../build/chain.ipa
