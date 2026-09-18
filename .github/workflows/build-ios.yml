@@ -34,86 +34,41 @@ jobs:
           cd "$PROJECT_DIR"
           echo "当前项目目录: $(pwd)"
 
-          # ⚠️ 核心修复：使用 printf 生成绝对无缩进、无格式错误的配置文件
+          # 1. 强制删除原配置文件，从零生成新文件
+          rm -f export_presets.cfg
+
+          # 2. 生成干净配置。使用 printf 确保没有任何多余的 YAML 缩进。
           printf '%s\n' \
             '[preset.0]' \
             'name="iOS"' \
             'platform="iOS"' \
             'runnable=true' \
-            'dedicated_server=false' \
-            'custom_features=""' \
             'export_filter="all_resources"' \
-            'include_filter=""' \
-            'exclude_filter=""' \
             'export_path="../../build/chain.ipa"' \
-            'patches=PackedStringArray()' \
-            'patch_delta_encoding=false' \
-            'patch_delta_compression_level_zstd=19' \
-            'patch_delta_min_reduction=0.1' \
-            'patch_delta_include_filters="*"' \
-            'patch_delta_exclude_filters=""' \
-            'encryption_include_filters=""' \
-            'encryption_exclude_filters=""' \
-            'seed=0' \
-            'encrypt_pck=false' \
-            'encrypt_directory=false' \
-            'script_export_mode=2' \
             '' \
             '[preset.0.options]' \
-            'custom_template/debug=""' \
-            'custom_template/release=""' \
-            'architectures/arm64=true' \
-            'application/app_store_team_id="XXXXXXXXXX"' \
-            'application/export_method_debug=3' \
+            'application/bundle_identifier="com.robloxdew.chain"' \
+            'application/app_store_team_id="ABCDE12345"' \
+            'application/signature=""' \
             'application/code_sign_identity_debug=""' \
             'application/code_sign_identity_release=""' \
             'application/provisioning_profile_specifier_debug=""' \
             'application/provisioning_profile_specifier_release=""' \
-            'application/export_method_release=3' \
-            'application/bundle_identifier="com.robloxdew.chain"' \
-            'application/signature=""' \
-            'application/short_version=""' \
-            'application/version=""' \
-            'application/additional_plist_content=""' \
-            'application/icon_interpolation=4' \
-            'application/export_project_only=false' \
-            'application/delete_old_export_files_unconditionally=false' \
-            'modules/camera=false' \
-            'entitlements/increased_memory_limit=false' \
-            'entitlements/game_center=false' \
-            'entitlements/push_notifications="Disabled"' \
-            'entitlements/additional=""' \
-            'capabilities/access_wifi=false' \
-            'capabilities/performance_gaming_tier=false' \
-            'capabilities/performance_a12=false' \
-            'capabilities/additional=PackedStringArray()' \
-            'shader_baker/enabled=false' \
-            'user_data/accessible_from_files_app=false' \
-            'user_data/accessible_from_itunes_sharing=false' \
-            'privacy/camera_usage_description=""' \
-            'privacy/microphone_usage_description=""' \
-            'privacy/photolibrary_usage_description=""' \
-            'privacy/file_timestamp_access_reasons=3' \
-            'privacy/system_boot_time_access_reasons=1' \
-            'privacy/disk_space_access_reasons=3' \
-            'privacy/active_keyboard_access_reasons=0' \
-            'privacy/user_defaults_access_reasons=0' \
-            'privacy/tracking_enabled=false' \
-            'privacy/tracking_domains=PackedStringArray()' \
+            'application/export_method_debug=0' \
+            'application/export_method_release=0' \
             'application/targeted_device_family=0' \
             'application/min_ios_version="14.0"' \
-            'storyboard/image_scale_mode=0' \
-            'storyboard/custom_image@2x=""' \
-            'storyboard/custom_image@3x=""' \
-            'storyboard/use_custom_bg_color=false' \
-            'storyboard/custom_bg_color=Color(0, 0, 0, 1)' \
+            'architectures/arm64=true' \
             > export_presets.cfg
 
-          echo "====== 检查配置文件中是否有非法字符（^I 表示制表符，$ 表示行尾） ======"
+          # 3. 最后用 sed 移除文件行首任何可能残留的空白字符（终极保险）
+          sed -i '' 's/^[[:space:]]*//' export_presets.cfg
+
+          echo "========== 检查生成的配置文件 =========="
           cat -A export_presets.cfg | head -n 20
-          
-          echo "====== 开始执行导出 ======"
-          godot --headless --export-release "iOS" ../../build/chain.ipa
+
+          echo "========== 开始执行导出（带 --verbose 以获取详细报错） =========="
+          godot --verbose --headless --export-release "iOS" ../../build/chain.ipa
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
