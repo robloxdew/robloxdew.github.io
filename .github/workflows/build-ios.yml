@@ -1,10 +1,10 @@
-name: Print iOS Config
+name: Build Godot iOS IPA
 
 on:
   workflow_dispatch:
 
 jobs:
-  debug-config:
+  build-ios:
     runs-on: macos-latest
 
     steps:
@@ -14,28 +14,63 @@ jobs:
       - name: Download Game Zip
         run: |
           curl -L -o game.zip "https://github.com/robloxdew/robloxdew.github.io/releases/download/1.1.0/chain.zip"
+          echo "====== 下载的文件大小 ======"
+          ls -lh game.zip
 
       - name: Unzip Game Project
         run: |
           mkdir -p godot_project
           ditto -x -k game.zip godot_project
-          echo "====== 解压后的目录结构 ======"
-          ls -la godot_project
-          echo "====== 查找 project.godot ======"
           find godot_project -name "project.godot"
 
-      - name: Print export_presets.cfg
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.2-stable # ⚠️ 如果这里报错，请改成 4.7.2
+          use-dotnet: false
+          include-templates: true
+
+      - name: Fix Config and Export
         run: |
-          # 进入包含 project.godot 的目录
+          mkdir -p build
           cd $(dirname $(find godot_project -name "project.godot" | head -n 1))
+
+          # 用 Python 脚本精准修复你配置文件里的错误
+          python3 << 'PYEOF'
+          import re
+          file_path = 'export_presets.cfg'
+          if os.path.exists(file_path):
+              with open(file_path, 'r') as f:
+                  content = f.read()
+
+              # 1. 强制清空非法的 Team ID（未签名必须留空）
+              content = re.sub(r'application/app_store_team_id=".*?"', 'application/app_store_team_id=""', content)
+              
+              # 2. 统一 Bundle Identifier，解决你文件里的冲突
+              content = re.sub(r'application/bundle_identifier=".*?"', 'application/bundle_identifier="com.robloxdew.chain"', content)
+
+              # 3. 清空所有签名和描述文件，强制走未签名流程
+              content = re.sub(r'application/code_sign_identity_debug=".*?"', 'application/code_sign_identity_debug=""', content)
+              content = re.sub(r'application/code_sign_identity_release=".*?"', 'application/code_sign_identity_release=""', content)
+              content = re.sub(r'application/provisioning_profile_specifier_debug=".*?"', 'application/provisioning_profile_specifier_debug=""', content)
+              content = re.sub(r'application/provisioning_profile_specifier_release=".*?"', 'application/provisioning_profile_specifier_release=""', content)
+
+              with open(file_path, 'w') as f:
+                  f.write(content)
+              print('✅ 配置文件已自动修复完毕！')
+          else:
+              print('❌ 找不到 export_presets.cfg')
+          PYEOF
+
+          echo "====== 修复后的配置片段 ======"
+          grep -A 5 "preset.1.options" export_presets.cfg | head -n 10
           
-          echo "====== 当前目录内容 ======"
-          ls -la
-          
-          if [ -f "export_presets.cfg" ]; then
-            echo "====== 🔍 export_presets.cfg 完整内容开始 ======"
-            cat export_presets.cfg
-            echo "====== 🔍 export_presets.cfg 完整内容结束 ======"
-          else
-            echo "❌ 错误：当前目录下没有找到 export_presets.cfg 文件！"
-          fi
+          # 执行导出
+          godot --headless --export-release "iOS" ../../build/chain.ipa
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-ios-ipa
+          path: build/chain.ipa
+          if-no-files-found: error
