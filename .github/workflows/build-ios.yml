@@ -33,14 +33,13 @@ jobs:
           mkdir -p build
           cd $(dirname $(find godot_project -name "project.godot" | head -n 1))
 
-          # 使用 sed 精准修改配置文件，解决冲突和非法字段
-          # 1. 清空非法的 Team ID（未签名必须留空）
-          sed -i '' 's|application/app_store_team_id=".*"|application/app_store_team_id=""|g' export_presets.cfg
-          
-          # 2. 统一 Bundle Identifier，解决你文件里 com.robloxdew.chain 和 com.dewrb.game 的冲突
+          # 1. 统一 Bundle Identifier，解决冲突
           sed -i '' 's|application/bundle_identifier=".*"|application/bundle_identifier="com.robloxdew.chain"|g' export_presets.cfg
           
-          # 3. 清空所有签名和描述文件，强制走未签名流程
+          # 2. 填一个假的有效格式 Team ID，骗过 Godot 的强校验（未签名构建无影响）
+          sed -i '' 's|application/app_store_team_id=".*"|application/app_store_team_id="XXXXXXXXXX"|g' export_presets.cfg
+          
+          # 3. 清空所有签名和描述文件
           sed -i '' 's|application/code_sign_identity_debug=".*"|application/code_sign_identity_debug=""|g' export_presets.cfg
           sed -i '' 's|application/code_sign_identity_release=".*"|application/code_sign_identity_release=""|g' export_presets.cfg
           sed -i '' 's|application/provisioning_profile_specifier_debug=".*"|application/provisioning_profile_specifier_debug=""|g' export_presets.cfg
