@@ -13,12 +13,19 @@ jobs:
 
       - name: Download Game Zip
         run: |
-          curl -L -o game.zip "https://github.com/robloxdew/robloxdew.github.io/releases/download/1.0.0/chain.zip"
+          # ⚠️ 更新为 1.1.0 的新链接
+          curl -L -o game.zip "https://github.com/robloxdew/robloxdew.github.io/releases/download/1.1.0/chain.zip"
+          echo "====== 下载的文件大小 ======"
+          ls -lh game.zip
+          file game.zip
 
       - name: Unzip Game Project
         run: |
           mkdir -p godot_project
           ditto -x -k game.zip godot_project
+          echo "====== 解压后的目录结构 ======"
+          ls -la godot_project
+          echo "====== 查找 project.godot ======"
           find godot_project -name "project.godot"
 
       - name: Setup Godot
@@ -28,14 +35,25 @@ jobs:
           use-dotnet: false
           include-templates: true
 
-      - name: Export iOS (Unsigned IPA)
+      - name: Fix iOS Config and Export
         run: |
           mkdir -p build
           cd $(dirname $(find godot_project -name "project.godot" | head -n 1))
-          echo "====== 🔍 打印 export_presets.cfg 内容 ======"
+          
+          # ⚠️ 自动确保 iOS 导出配置里有包名，防止因为配置不全报错
+          echo "====== 修复前的 export_presets.cfg ======"
           cat export_presets.cfg
-          echo "=========================================="
-          # ⚠️ 确保这个 "iOS" 跟你的预设名一致
+          
+          if ! grep -q "application/bundle_identifier" export_presets.cfg; then
+            sed -i '' '/\[preset.0.options\]/a\
+          application/bundle_identifier="com.robloxdew.chain"
+          ' export_presets.cfg
+          fi
+          
+          echo "====== 修复后的配置 ======"
+          cat export_presets.cfg
+          
+          # ⚠️ 这个 "iOS" 必须和 Godot 预设名一致
           godot --headless --export-release "iOS" ../../build/chain.ipa
 
       - name: Upload IPA Artifact
